@@ -1,10 +1,10 @@
-import uuid
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from django.db import transaction
-from .serializers import SendNotificationSerializer
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from .models import Notification
+from .serializers import SendNotificationSerializer
 from .tasks import send_notification_task
 
 
@@ -39,7 +39,8 @@ class SendNotificationView(APIView):
                 created = True
         if created:
             send_notification_task.delay(notif.id)
-        return Response({"notificationId": notif.id}, status=status.HTTP_202_ACCEPTED)
+        return Response({"notificationId": notif.id},
+                        status=status.HTTP_202_ACCEPTED)
 
 
 class NotificationStatusView(APIView):
