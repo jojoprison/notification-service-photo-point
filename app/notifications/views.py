@@ -14,16 +14,31 @@ class SendNotificationView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         channels = data.get("channelsOrder") or ["telegram", "email", "sms"]
+        idem_key = data.get("idempotencyKey")
         with transaction.atomic():
-            notif = Notification.objects.create(
-                user_id=data["userId"],
-                template_id=data["templateId"],
-                payload_json=data.get("payload", {}),
-                channels_order=channels,
-                idempotency_key=data.get("idempotencyKey"),
-                status="queued",
-            )
-        send_notification_task.delay(notif.id)
+            if idem_key:
+                notif, created = Notification.objects.get_or_create(
+                    idempotency_key=idem_key,
+                    defaults={
+                        "user_id": data["userId"],
+                        "template_id": data["templateId"],
+                        "payload_json": data.get("payload", {}),
+                        "channels_order": channels,
+                        "status": "queued",
+                    },
+                )
+            else:
+                notif = Notification.objects.create(
+                    user_id=data["userId"],
+                    template_id=data["templateId"],
+                    payload_json=data.get("payload", {}),
+                    channels_order=channels,
+                    idempotency_key=None,
+                    status="queued",
+                )
+                created = True
+        if created:
+            send_notification_task.delay(notif.id)
         return Response({"notificationId": notif.id}, status=status.HTTP_202_ACCEPTED)
 
 
